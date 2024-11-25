@@ -1,0 +1,14 @@
+# Default Properties
+credentials:
+  client-secret: ""
+  org-id: ""
+  client-id: ""
+admin:
+  user: "admin"
+  pass: "admin"
+developer:
+  user: "developer"
+  pass: "developer"
+support:
+  user: "support"
+  pass: "support"

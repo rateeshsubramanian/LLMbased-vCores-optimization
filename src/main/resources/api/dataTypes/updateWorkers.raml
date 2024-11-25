@@ -1,0 +1,26 @@
+#%RAML 1.0 DataType
+displayName: Update Workers
+description: Data type to update workers
+additionalProperties: true
+type: object
+properties:
+  worker:
+    description: worker
+    type: string
+    required: true
+    example: "0.1"
+  workerSize:
+    description: workerSize
+    type: string
+    required: true
+    example: "1"
+  applicationName:
+    description: applicationName
+    type: string
+    required: true
+    example: "exp-cart-api"
+  Environ:
+    description: Environment
+    type: string
+    required: true
+    example: "SIT"

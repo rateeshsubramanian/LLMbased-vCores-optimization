@@ -1,0 +1,6 @@
+{ 
+  "worker": "0.1", 
+  "workerSize": "1", 
+  "applicationName": "exp-cart-api", 
+  "Environ": "SIT" 
+}

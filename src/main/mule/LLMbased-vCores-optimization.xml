@@ -1,0 +1,497 @@
+<?xml version="1.0" encoding="UTF-8"?>                                                                                      
+<mule xmlns:ms-aichain="http://www.mulesoft.org/schema/mule/ms-aichain" xmlns:spring="http://www.mulesoft.org/schema/mule/spring" xmlns:secure-properties="http://www.mulesoft.org/schema/mule/secure-properties" xmlns:os="http://www.mulesoft.org/schema/mule/os" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd 
+http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/current/mule-os.xsd
+http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd
+http://www.mulesoft.org/schema/mule/spring http://www.mulesoft.org/schema/mule/spring/current/mule-spring.xsd
+http://www.mulesoft.org/schema/mule/ms-aichain http://www.mulesoft.org/schema/mule/ms-aichain/current/mule-ms-aichain.xsd">
+    <http:listener-config name="exp-vcores-mgmt-api-httpListenerConfig">
+        <http:listener-connection host="0.0.0.0" port="8085" /> 
+    </http:listener-config>      
+                                                     
+    <apikit:config name="exp-vcores-mgmt-api-config" api="exp-vcores-mgmt-api.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+    <http:request-config name="HTTP_Request_configuration-Anypoint" doc:name="HTTP Request configuration" doc:id="b76cf3af-b51d-43f8-b730-208d9c48cb50" >
+		<http:request-connection host="anypoint.mulesoft.com" port="443" connectionIdleTimeout="3000000" protocol="HTTPS"/>
+	</http:request-config>
+	<os:object-store name="Object_store" doc:name="Object store" doc:id="4b0ec282-5aea-4c4f-9ef3-240e4cac5f73" entryTtl="5" entryTtlUnit="MINUTES" expirationInterval="4"/>
+	<configuration-properties doc:name="Configuration properties" doc:id="d324a0a2-01c9-46a5-8883-eea110900202" file="properties.yaml" />
+	<secure-properties:config name="Secure_Properties_Config" doc:name="Secure Properties Config" doc:id="b2aacc3c-32b8-4da1-96ff-c30a819c317c" file="properties.yaml" key="${security.key}" />
+	
+	<spring:config name="Spring_Config" doc:name="Spring Config" doc:id="2ec3a51b-5467-4895-b253-0135e65797aa" files="beans.xml" />
+	<spring:security-manager doc:name="Spring Security manager" doc:id="237670d6-7e13-4abf-937b-dc5ac8b8e369" >
+		
+			<spring:delegate-security-provider name="mule" delegate-ref="authenticationManager" />
+	     
+	</spring:security-manager>
+	<ms-aichain:config name="MuleSoft_AI_Chain_Config" llmType="OPENAI" configType="Configuration Json" modelName="gpt-3.5-turbo" doc:name="MuleSoft AI Chain Config" doc:id="f98811c1-00f1-4d48-8269-08548884b136" filePath='#[mule.home ++ "/apps/" ++ app.name ++ "/envVars.json"]' />
+	<flow name="exp-vcores-mgmt-api-main">
+        <http:listener config-ref="exp-vcores-mgmt-api-httpListenerConfig" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>  
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <http:basic-security-filter doc:name="Basic security filter" doc:id="25ba7144-16cb-4165-9409-53df53289dec" realm="mule"/>
+		<spring:authorization-filter doc:name="Authorization filter" doc:id="7b922030-ad7c-422a-b180-87c0dcb8fd57" requiredAuthorities="ROLE_ADMIN,ROLE_DEVELOPER,ROLE_SUPPORT"/>
+		<apikit:router config-ref="exp-vcores-mgmt-api-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:BAD_REQUEST">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Bad request"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">400</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:METHOD_NOT_ALLOWED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Method not allowed"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">405</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_ACCEPTABLE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not acceptable"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">406</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:UNSUPPORTED_MEDIA_TYPE">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Unsupported media type"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">415</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+            <on-error-propagate type="APIKIT:NOT_IMPLEMENTED">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Not Implemented"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">501</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+	<flow name="exp-vcores-mgmt-api-console">
+        <http:listener config-ref="exp-vcores-mgmt-api-httpListenerConfig" path="/console/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <apikit:console config-ref="exp-vcores-mgmt-api-config" />
+        <error-handler>
+            <on-error-propagate type="APIKIT:NOT_FOUND">
+                <ee:transform doc:name="Transform Message">
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{message: "Resource not found"}]]></ee:set-payload>
+                    </ee:message>
+                    <ee:variables>
+                        <ee:set-variable variableName="httpStatus">404</ee:set-variable>
+                    </ee:variables>
+                </ee:transform>
+            </on-error-propagate>
+        </error-handler>
+    </flow>
+    <flow name="get:\list-apps:exp-vcores-mgmt-api-config">
+		<spring:authorization-filter doc:name="Authorization filter" doc:id="1ddef2ab-34f0-4bdc-8beb-f83be59153ca" requiredAuthorities="ROLE_ADMIN,ROLE_DEVELOPER,ROLE_SUPPORT" />
+		<ee:transform doc:name="Transform Message1" doc:id="c20a94d4-7a5d-4e79-93ed-466028c29b5d" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="vEnv" ><![CDATA[attributes.queryParams.Environment]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Flow Reference" doc:id="2b34b980-8c9a-417c-b561-4123eb9ad9bc" name="auth" />
+		<http:request method="GET" doc:name="Request" doc:id="f857bca3-eebb-4d84-8c34-ed1cfe4a82e4" config-ref="HTTP_Request_configuration-Anypoint" path="/cloudhub/api/v2/applications" responseTimeout="600000">
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.vToken,
+	"X-ANYPNT-ORG-ID" : p('secure::credentials.org-id'),
+	"X-ANYPNT-ENV-ID"  : vars.vEnv
+	
+}]]]></http:headers>
+		</http:request>
+		<ee:transform doc:name="Transform Message2" doc:id="0486d56c-611a-47e3-8d9b-2fcf91160429" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[    %dw 2.0
+    import * from dw::core::Arrays
+output application/json
+var multipliedValues = payload filter ($.status != "UNDEPLOYED") map ((item) -> item.workers.'type'.weight * item.workers.amount)
+var totalStaticIps = sizeOf(payload filter (item) -> item."staticIPsEnabled" == true) 
+var totalUndeployedAPIs = sizeOf(payload filter (item) -> item."status" == "UNDEPLOYED")
+var totalStartedAPIs = sizeOf(payload filter (item) -> item."status" == "STARTED")
+---
+{
+	"details1": payload filter ($.status != "UNDEPLOYED" or $.staticIPsEnabled == true) map (item, index) -> {
+		"sl-no": index + 1,
+		"app-name": item.domain,
+		"status": item.status,
+		"workers": item.workers."type".weight,
+		"worker-size": item.workers.amount,
+		"mule-version": item.muleVersion.version,
+		"java-version": item.muleVersion.javaVersion,
+		"static-ip-enabled" : item.staticIPsEnabled,
+		 "color": if (item.workers.amount > 2 or item.workers."type".weight > 0.2 ) "#ff7f7f" else if (item.workers.amount == 2 or item.workers."type".weight == 0.2 ) "#F9E371" else if (item.staticIPsEnabled == true ) "grey" else "#ccffb3",
+		 "isEditing" : if (item.staticIPsEnabled == true and item.status== "UNDEPLOYED" ) "true" else "false"
+	},
+	"total-workers": {
+		"totalOrgWorkers": flatten(payload.workers.totalOrgWorkers)[0] as Number as String {format: "0.0", roundMode:"UP"} default "N/A",
+		"remainingOrgWorkers": flatten(payload.workers.remainingOrgWorkers)[0] as Number as String {format: "0.0", roundMode:"UP"} default "N/A",
+		"totalUsedByThisEnv":multipliedValues sumBy ((value) -> value)  default 0,
+		"totalStaticIpsByThisEnv": totalStaticIps  default 0,
+		"totalStartedAPIs": totalStartedAPIs default 0,
+		"totalUndeployedAPIs": totalUndeployedAPIs default 0
+	}
+}
+]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+    </flow>
+    <flow name="get:\list-environments:exp-vcores-mgmt-api-config">
+		<spring:authorization-filter doc:name="Authorization filter" doc:id="273b68f5-0a4a-4006-9385-72e2a82bb723" requiredAuthorities="ROLE_ADMIN,ROLE_DEVELOPER" />
+		<flow-ref doc:name="Flow Reference" doc:id="e9d52ff5-8def-403e-9e44-5b2678b32b6e" name="auth" />
+		<http:request method="GET" doc:name="Request" doc:id="ebd30d84-9325-4a11-a024-1383a71a74e0" config-ref="HTTP_Request_configuration-Anypoint" path="/accounts/api/organizations/{orgid}/environments" responseTimeout="600000">
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.vToken,
+	"X-ANYPNT-ORG-ID" : p('secure::credentials.org-id')
+	
+	
+}]]]></http:headers>
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"orgid" : p('secure::credentials.org-id')
+}]]]></http:uri-params>
+		</http:request>
+		<ee:transform doc:name="Transform Message1" doc:id="d6b185ff-9863-41cc-925d-0e32aa97a6d3" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+  environments: payload.data filter $.isProduction == false map {
+    id: $.id,
+    name: $.name
+  }
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+    </flow>
+    <flow name="post:\update-workers:application\json:exp-vcores-mgmt-api-config">
+		<spring:authorization-filter doc:name="Authorization filter" doc:id="869b1cc6-c65f-492f-ae52-a4ad13b83fcd" requiredAuthorities="ROLE_ADMIN,ROLE_DEVELOPER" />
+		<ee:transform doc:name="Transform Message1" doc:id="06255f5f-388c-44a6-bdc2-abda4c52d6b0" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="vPayload" ><![CDATA[%dw 2.0
+output application/json
+---
+{
+    "workers": {
+        "type": {
+            "name": payload.worker
+            //"weight": 0.1
+           // "cpu": "0.1 vCores",
+           // "memory": "500 MB memory"
+        },
+        "amount": payload.workerSize
+    }
+}]]></ee:set-variable>
+				<ee:set-variable variableName="vAppName" ><![CDATA[payload.applicationName]]></ee:set-variable>
+				<ee:set-variable variableName="vEnvId" ><![CDATA[payload.Environ]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Flow Reference" doc:id="66b95872-1ec8-4b3a-97a0-ec448edf167b" name="auth" />
+		<http:request method="PUT" doc:name="Request" doc:id="1b056caa-1bda-416d-a83e-9ac606085896" config-ref="HTTP_Request_configuration-Anypoint" path="/cloudhub/api/v2/applications/{AppName}" responseTimeout="60000">
+			<http:body ><![CDATA[#[vars.vPayload]]]></http:body>
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.vToken,
+	"X-ANYPNT-ORG-ID" : p('secure::credentials.org-id'),
+	"X-ANYPNT-ENV-ID"  : vars.vEnvId
+	
+}]]]></http:headers>
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"AppName" : vars.vAppName
+}]]]></http:uri-params>
+		</http:request>
+		<ee:transform doc:name="Transform Message2" doc:id="54371176-a4bb-4c2c-8fad-533aa591890e" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"Message" : if (attributes.statusCode==200) "Updated Successfully!" else "Error",
+	"ok" : true
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<error-handler>
+			<on-error-propagate enableNotifications="true" logException="true" doc:name="On Error Propagate" doc:id="f1e3d61f-3318-427b-a301-ebc8e3b13e21" type="NOT_PERMITTED">
+				<ee:transform doc:name="Transform Message" doc:id="e55d98bb-5044-4f86-93a2-be49eec9ac89" >
+					<ee:message >
+						<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+{
+	"message" : "Unauthorized!"
+}]]></ee:set-payload>
+					</ee:message>
+				</ee:transform>
+			</on-error-propagate>
+		</error-handler>
+    </flow>
+	<sub-flow name="auth" doc:id="a0e0f3f4-ed53-49f2-b393-4653bd476288" >
+		<os:retrieve doc:id="66c4a0cb-1ad9-4b2b-be76-ff2acf3ec50a" key="token" objectStore="Object_store" target="vToken" doc:name="Retrieve" >
+			<os:default-value ><![CDATA[auth]]></os:default-value>
+		</os:retrieve>
+		<choice doc:name="Choice" doc:id="e68b0f95-8d47-43a3-b711-ba5fc6899780" >
+			<when expression='#[vars.vToken=="auth"]' >
+				<http:request method="POST" doc:name="Request" doc:id="d91b56af-05e9-4f86-8db8-47334ce41044" config-ref="HTTP_Request_configuration-Anypoint" path="/accounts/api/v2/oauth2/token" target="vRespToken" responseTimeout="600000">
+					<http:body ><![CDATA[#[%dw 2.0
+output application/x-www-form-urlencoded
+---
+{
+
+client_id: p('secure::credentials.client-id'),
+
+client_secret: p('secure::credentials.client-secret'),
+
+grant_type:"client_credentials"
+
+}]]]></http:body>
+					<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Content-Type" : "application/x-www-form-urlencoded"
+}]]]></http:headers>
+				</http:request>
+				<os:store doc:id="38c31cd0-7428-4d13-8cca-ec0fb7e5a805" key="token" objectStore="Object_store" doc:name="Store" >
+					<os:value ><![CDATA[#[vars.vRespToken.access_token]]]></os:value>
+				</os:store>
+				<ee:transform doc:name="Transform Message" doc:id="54bfe853-2793-461f-b25a-7c2e59db978c" >
+					<ee:message />
+					<ee:variables >
+						<ee:set-variable variableName="vToken" ><![CDATA[vars.vRespToken.access_token]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<remove-variable doc:name="Remove Variable" doc:id="72f604a7-700a-4cdc-a333-f0b7d0d536d4" variableName="vRespToken" />
+			</when>
+		</choice>
+	</sub-flow>
+	<flow name="post:\show-metrics:exp-vcores-mgmt-api-config" doc:id="e81b316c-9d07-4985-a341-d4f5699aa3d1" >
+		<spring:authorization-filter doc:name="Authorization filter" doc:id="fc326e26-04ae-4ab2-8199-f9971c218374" requiredAuthorities="ROLE_ADMIN,ROLE_DEVELOPER,ROLE_SUPPORT" />
+		<!-- [STUDIO:"Transform Message"]<ee:transform doc:name="Transform Message" doc:id="59c936fe-8487-4557-b0a7-615dcebb7788" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+&#45;&#45;-
+{"Environ":"439b821d-97bc-4858-8423-faf2d93310c5","applicationName":"sys-abcamit-amazon-s3-api-v1-uat","workerSize":"0.1","workers":"1"}&#93;&#93;></ee:set-payload>
+			</ee:message>
+		</ee:transform> [STUDIO] -->
+		<logger level="INFO" doc:name="Logger" doc:id="b14edcc6-93c1-4781-bca1-12d89cf48fd0" message="#[payload]"/>
+		<ee:transform doc:name="Transform Message" doc:id="ab3eaf13-510d-4ea5-bbf0-4a0f7f045790" >
+			<ee:message >
+			</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="vWorkerSize" ><![CDATA[payload.workerSize]]></ee:set-variable>
+				<ee:set-variable variableName="vWorkers" ><![CDATA[payload.workers]]></ee:set-variable>
+				<ee:set-variable variableName="vWorkerSizeValue" ><![CDATA[payload.workerSizeValue]]></ee:set-variable>
+				<ee:set-variable variableName="vApplicationName" ><![CDATA[payload.applicationName]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<flow-ref doc:name="Flow Reference" doc:id="42e289c7-a3d6-439b-bce6-bd8a4ce3f711" name="auth" />
+		<ee:transform doc:name="Transform Message" doc:id="5382e9a0-bf7a-44e5-ad33-81e804430331" >
+			<ee:message />
+			<ee:variables >
+				<ee:set-variable variableName="startDate" ><![CDATA[now()-|P5D|]]></ee:set-variable>
+				<ee:set-variable variableName="endDate" ><![CDATA[now()]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<http:request method="GET" doc:name="Request" doc:id="c21fa079-4f19-49bd-a39e-c8b1e05a22af" config-ref="HTTP_Request_configuration-Anypoint" path="/cloudhub/api/v2/applications/{api-name}/dashboardStats" responseTimeout="900000" >
+			<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Authorization" : "Bearer " ++ vars.vToken,
+	"X-ANYPNT-ORG-ID" : p('secure::credentials.org-id'),
+	"X-ANYPNT-ENV-ID" : payload.Environ
+	
+	
+}]]]></http:headers>
+			<http:uri-params ><![CDATA[#[output application/java
+---
+{
+	"api-name" : payload.applicationName
+}]]]></http:uri-params>
+			<http:query-params ><![CDATA[#[output application/json
+---
+{
+	"statistics" : "cpu",
+	"statistics" : "memoryPercentageUsed",
+	//"statistics" : "memoryTotalUsed",
+	"startDate":vars.startDate as String,
+"endDate":vars.endDate as String
+	
+}]]]></http:query-params>
+		</http:request>
+		<ee:transform doc:name="Transform Message1" doc:id="4b8511a4-bce2-4223-b8ba-ac4fef5831cf" >
+			<ee:message >
+			
+</ee:message>
+			<ee:variables >
+				<ee:set-variable variableName="vStats" ><![CDATA[%dw 2.0
+output application/json
+---
+payload]]></ee:set-variable>
+				<ee:set-variable variableName="vChartPayload" ><![CDATA[fun transformEvents(events) =
+    {
+        "events": events
+    }
+
+fun transformWorkerStatistics(workerStatistics, type1) =
+    workerStatistics map ((ws) ->
+        {
+            "id": ws.id,
+            "statistics": {
+                (type1): (ws.statistics[type1] pluck ((v, k) -> {
+                    (k):   v as String {format: "0.0", roundMode:"UP"} as Number 
+                })) reduce ((item, accumulator = {}) -> accumulator ++ item)
+            } 
+        }
+    )
+---
+{
+    "events": transformEvents(payload.events),
+    "cpu": transformWorkerStatistics(payload.workerStatistics, "cpu"),
+    "memory": transformWorkerStatistics(payload.workerStatistics, "memoryPercentageUsed")
+}]]></ee:set-variable>
+			</ee:variables>
+		
+</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="e1596a47-0004-43f3-8f01-b596b7cd7722">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json indent=false
+fun roundToOneDecimal(num) = floor(num * 10) / 10
+
+---
+{
+    timeFrom: vars.startDate,
+    timeTo: vars.endDate,
+    eventsBetweenTimeFromAndTimeTo: payload.events pluck $,
+    workerStatistics: payload.workerStatistics map {
+        id: $.id,
+        statistics: {
+            memoryPercentageUsedBetweenTimeFromAndTimeTo: $.statistics.memoryPercentageUsed pluck roundToOneDecimal($),
+            cpuBetweenTimeFromAndTimeTo: $.statistics.cpu pluck roundToOneDecimal($)
+        }
+    }
+    
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Logger" doc:id="3ff2ec38-f51d-44be-9739-6497e5f5678f" message="#[payload]"/>
+		<ms-aichain:agent-define-prompt-template doc:name="Agent define prompt template" doc:id="7b8fb826-7937-464d-9ec3-fe15f8a99f43" config-ref="MuleSoft_AI_Chain_Config">
+			<ms-aichain:dataset ><![CDATA[#[%dw 2.0
+output text/plain
+---
+write(payload, "application/json",  { "indent": false })]]]></ms-aichain:dataset>
+			<ms-aichain:template ><![CDATA[#["PROVIDED IN DATASET ARE the statistics for number of events, cpu usage and memory usage of the workers of a mule api called " ++ vars.vApplicationName ++ ". Current vcore size is " ++ vars.vWorkerSizeValue ++ " and number of workers is " ++ vars.vWorkers ++ "  based on the provided stats in the Dataset what should be the correct settings of mule api vcores and workers. provide minimum settings so we dont waste the vcores. Suggest if vcores and workers needs to be increased if average memory and cpu usage is greater than 70
+percentage. Use the provided dataset and do not assume. You can also refer the links - https://docs.mulesoft.com/cloudhub/cloudhub-architecture"]]]></ms-aichain:template>
+			<ms-aichain:instructions ><![CDATA[provide the response in json with fields new vcores, new workers, analysisOfDataset and justification. Maximum workers possible in mule is 8. The vcore sizes available are 0.1,0.2,1,2,4,8,16.]]></ms-aichain:instructions>
+		</ms-aichain:agent-define-prompt-template>
+		<ee:transform doc:name="Transform Message" doc:id="828590ce-3b7f-48a8-8434-44ecb7742523" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[%dw 2.0
+output application/json
+---
+read(payload.response, "application/json")]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<ee:transform doc:name="Transform Message" doc:id="9dabae5a-19ff-4f66-bf79-77e61f8dc5b7" >
+			<ee:message >
+				<ee:set-payload ><![CDATA[fun transformEvents(events) =
+    {
+        "events": events
+    }
+
+fun transformWorkerStatistics(workerStatistics, type1) =
+    workerStatistics map ((ws) ->
+        {
+            "id": ws.id,
+            "statistics": {
+                (type1): (ws.statistics[type1] pluck ((v, k) -> {
+                    (k):   v as String {format: "0.0", roundMode:"UP"} as Number 
+                })) reduce ((item, accumulator = {}) -> accumulator ++ item)
+            } 
+        }
+    )
+---
+{
+	"AI-Suggestions" : payload,
+    "events": transformEvents(vars.vStats.events),
+    "cpu": transformWorkerStatistics(vars.vStats.workerStatistics, "cpu"),
+    "memory": transformWorkerStatistics(vars.vStats.workerStatistics, "memoryPercentageUsed")
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+	
+</flow>
+	
+</mule>

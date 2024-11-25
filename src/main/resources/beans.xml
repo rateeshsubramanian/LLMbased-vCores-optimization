@@ -1,0 +1,27 @@
+<beans xmlns="http://www.springframework.org/schema/beans"
+  xmlns:context="http://www.springframework.org/schema/context"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:jdbc="http://www.springframework.org/schema/jdbc"
+  xmlns:ss="http://www.springframework.org/schema/security"
+
+  xsi:schemaLocation="http://www.springframework.org/schema/beans
+      http://www.springframework.org/schema/beans/spring-beans-4.2.xsd
+      http://www.springframework.org/schema/jdbc
+      http://www.springframework.org/schema/jdbc/spring-jdbc-4.2.xsd
+      http://www.springframework.org/schema/context
+      http://www.springframework.org/schema/context/spring-context-4.2.xsd
+      http://www.springframework.org/schema/security
+      http://www.springframework.org/schema/security/spring-security-5.8.xsd">
+
+  <ss:authentication-manager alias="authenticationManager">
+    <ss:authentication-provider>
+      <ss:user-service id="mule">
+        <ss:user name="${admin.user}" password="{noop}${admin.pass}" authorities="ROLE_ADMIN" />
+        <ss:user name="${developer.user}" password="{noop}${developer.pass}" authorities="ROLE_DEVELOPER" />
+        <ss:user name="${support.user}" password="{noop}${support.pass}" authorities="ROLE_SUPPORT" />
+        
+      </ss:user-service>
+    </ss:authentication-provider>
+  </ss:authentication-manager>
+
+</beans>

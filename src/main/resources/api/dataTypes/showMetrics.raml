@@ -1,0 +1,16 @@
+#%RAML 1.0 DataType
+displayName: Show Metrics
+description: Data type for Show Metrics
+additionalProperties: true
+type: object
+properties:
+  applicationName:
+    description: applicationName
+    type: string
+    required: true
+    example: "exp-cart-api"
+  Environ:
+    description: Environment
+    type: string
+    required: true
+    example: "SIT"
