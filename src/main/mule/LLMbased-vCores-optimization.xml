@@ -4,11 +4,6 @@ http://www.mulesoft.org/schema/mule/os http://www.mulesoft.org/schema/mule/os/cu
 http://www.mulesoft.org/schema/mule/secure-properties http://www.mulesoft.org/schema/mule/secure-properties/current/mule-secure-properties.xsd
 http://www.mulesoft.org/schema/mule/spring http://www.mulesoft.org/schema/mule/spring/current/mule-spring.xsd
 http://www.mulesoft.org/schema/mule/ms-aichain http://www.mulesoft.org/schema/mule/ms-aichain/current/mule-ms-aichain.xsd">
-    <http:listener-config name="exp-vcores-mgmt-api-httpListenerConfig">
-        <http:listener-connection host="0.0.0.0" port="8085" /> 
-    </http:listener-config>      
-                                                     
-    <apikit:config name="exp-vcores-mgmt-api-config" api="exp-vcores-mgmt-api.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
     <http:request-config name="HTTP_Request_configuration-Anypoint" doc:name="HTTP Request configuration" doc:id="b76cf3af-b51d-43f8-b730-208d9c48cb50" >
 		<http:request-connection host="anypoint.mulesoft.com" port="443" connectionIdleTimeout="3000000" protocol="HTTPS"/>
 	</http:request-config>
@@ -23,20 +18,25 @@ http://www.mulesoft.org/schema/mule/ms-aichain http://www.mulesoft.org/schema/mu
 	     
 	</spring:security-manager>
 	<ms-aichain:config name="MuleSoft_AI_Chain_Config" llmType="OPENAI" configType="Configuration Json" modelName="gpt-3.5-turbo" doc:name="MuleSoft AI Chain Config" doc:id="f98811c1-00f1-4d48-8269-08548884b136" filePath='#[mule.home ++ "/apps/" ++ app.name ++ "/envVars.json"]' />
-	<flow name="exp-vcores-mgmt-api-main">
-        <http:listener config-ref="exp-vcores-mgmt-api-httpListenerConfig" path="/api/*">
+	<apikit:config outboundHeadersMapName="outboundHeadersMapName" httpStatusVarName="httpStatus" doc:name="Router" doc:id="ef55958e-cd3c-440e-892e-f5e75d238689" name="LLMbased-vCores-optimization" api="LLMbased-vCores-optimization.raml" raml="api\LLMbased-vCores-optimization.raml">
+	</apikit:config>
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config" doc:id="a81b14e5-4334-45a1-86db-afd1df41b8f8" basePath="/">
+		<http:listener-connection host="0.0.0.0" port="8085" />
+	</http:listener-config>
+	<flow name="LLMbased-vCores-optimization-main">
+        <http:listener path="/api/*" config-ref="HTTP_Listener_config">
             <http:response statusCode="#[vars.httpStatus default 200]">
-                <http:headers>#[vars.outboundHeaders default {}]</http:headers>  
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>  
             </http:response>
             <http:error-response statusCode="#[vars.httpStatus default 500]">
-                <http:body>#[payload]</http:body>
-                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
             </http:error-response>
         </http:listener>
         <http:basic-security-filter doc:name="Basic security filter" doc:id="25ba7144-16cb-4165-9409-53df53289dec" realm="mule"/>
-		<spring:authorization-filter doc:name="Authorization filter" doc:id="7b922030-ad7c-422a-b180-87c0dcb8fd57" requiredAuthorities="ROLE_ADMIN,ROLE_DEVELOPER,ROLE_SUPPORT"/>
-		<apikit:router config-ref="exp-vcores-mgmt-api-config" />
-        <error-handler>
+		<spring:authorization-filter doc:name="Authorization filter" doc:id="7b922030-ad7c-422a-b180-87c0dcb8fd57" requiredAuthorities="ROLE_ADMIN"/>
+        <apikit:router doc:name="APIkit Router" doc:id="db86b488-1edc-41ac-a446-89fff16a0a00" config-ref="LLMbased-vCores-optimization"/>
+		<error-handler>
             <on-error-propagate type="APIKIT:BAD_REQUEST">
                 <ee:transform doc:name="Transform Message">
                     <ee:message>
@@ -118,16 +118,16 @@ output application/json
         </error-handler>
     </flow>
 	<flow name="exp-vcores-mgmt-api-console">
-        <http:listener config-ref="exp-vcores-mgmt-api-httpListenerConfig" path="/console/*">
+        <http:listener path="/console/*" config-ref="HTTP_Listener_config">
             <http:response statusCode="#[vars.httpStatus default 200]">
-                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
             </http:response>
             <http:error-response statusCode="#[vars.httpStatus default 500]">
-                <http:body>#[payload]</http:body>
-                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+                <http:body><![CDATA[#[payload]]]></http:body>
+                <http:headers><![CDATA[#[vars.outboundHeaders default {}]]]></http:headers>
             </http:error-response>
         </http:listener>
-        <apikit:console config-ref="exp-vcores-mgmt-api-config" />
+        <apikit:console config-ref="LLMbased-vCores-optimization" />
         <error-handler>
             <on-error-propagate type="APIKIT:NOT_FOUND">
                 <ee:transform doc:name="Transform Message">
@@ -144,8 +144,8 @@ output application/json
             </on-error-propagate>
         </error-handler>
     </flow>
-    <flow name="get:\list-apps:exp-vcores-mgmt-api-config">
-		<spring:authorization-filter doc:name="Authorization filter" doc:id="1ddef2ab-34f0-4bdc-8beb-f83be59153ca" requiredAuthorities="ROLE_ADMIN,ROLE_DEVELOPER,ROLE_SUPPORT" />
+    <flow name="get:\list-apps:LLMbased-vCores-optimization">
+		<spring:authorization-filter doc:name="Authorization filter" doc:id="1ddef2ab-34f0-4bdc-8beb-f83be59153ca" requiredAuthorities="ROLE_ADMIN" />
 		<ee:transform doc:name="Transform Message1" doc:id="c20a94d4-7a5d-4e79-93ed-466028c29b5d" >
 			<ee:message />
 			<ee:variables >
@@ -199,8 +199,8 @@ var totalStartedAPIs = sizeOf(payload filter (item) -> item."status" == "STARTED
 			</ee:message>
 		</ee:transform>
     </flow>
-    <flow name="get:\list-environments:exp-vcores-mgmt-api-config">
-		<spring:authorization-filter doc:name="Authorization filter" doc:id="273b68f5-0a4a-4006-9385-72e2a82bb723" requiredAuthorities="ROLE_ADMIN,ROLE_DEVELOPER" />
+    <flow name="get:\list-environments:LLMbased-vCores-optimization">
+		<spring:authorization-filter doc:name="Authorization filter" doc:id="273b68f5-0a4a-4006-9385-72e2a82bb723" requiredAuthorities="ROLE_ADMIN" />
 		<flow-ref doc:name="Flow Reference" doc:id="e9d52ff5-8def-403e-9e44-5b2678b32b6e" name="auth" />
 		<http:request method="GET" doc:name="Request" doc:id="ebd30d84-9325-4a11-a024-1383a71a74e0" config-ref="HTTP_Request_configuration-Anypoint" path="/accounts/api/organizations/{orgid}/environments" responseTimeout="600000">
 			<http:headers ><![CDATA[#[output application/java
@@ -231,8 +231,8 @@ output application/json
 			</ee:message>
 		</ee:transform>
     </flow>
-    <flow name="post:\update-workers:application\json:exp-vcores-mgmt-api-config">
-		<spring:authorization-filter doc:name="Authorization filter" doc:id="869b1cc6-c65f-492f-ae52-a4ad13b83fcd" requiredAuthorities="ROLE_ADMIN,ROLE_DEVELOPER" />
+    <flow name="post:\update-workers:application\json:LLMbased-vCores-optimization">
+		<spring:authorization-filter doc:name="Authorization filter" doc:id="869b1cc6-c65f-492f-ae52-a4ad13b83fcd" requiredAuthorities="ROLE_ADMIN" />
 		<ee:transform doc:name="Transform Message1" doc:id="06255f5f-388c-44a6-bdc2-abda4c52d6b0" >
 			<ee:message />
 			<ee:variables >
@@ -335,17 +335,8 @@ grant_type:"client_credentials"
 			</when>
 		</choice>
 	</sub-flow>
-	<flow name="post:\show-metrics:exp-vcores-mgmt-api-config" doc:id="e81b316c-9d07-4985-a341-d4f5699aa3d1" >
-		<spring:authorization-filter doc:name="Authorization filter" doc:id="fc326e26-04ae-4ab2-8199-f9971c218374" requiredAuthorities="ROLE_ADMIN,ROLE_DEVELOPER,ROLE_SUPPORT" />
-		<!-- [STUDIO:"Transform Message"]<ee:transform doc:name="Transform Message" doc:id="59c936fe-8487-4557-b0a7-615dcebb7788" >
-			<ee:message >
-				<ee:set-payload ><![CDATA[%dw 2.0
-output application/json
-&#45;&#45;-
-{"Environ":"439b821d-97bc-4858-8423-faf2d93310c5","applicationName":"sys-abcamit-amazon-s3-api-v1-uat","workerSize":"0.1","workers":"1"}&#93;&#93;></ee:set-payload>
-			</ee:message>
-		</ee:transform> [STUDIO] -->
-		<logger level="INFO" doc:name="Logger" doc:id="b14edcc6-93c1-4781-bca1-12d89cf48fd0" message="#[payload]"/>
+	<flow name="post:\show-metrics:LLMbased-vCores-optimization" doc:id="e81b316c-9d07-4985-a341-d4f5699aa3d1" >
+		<spring:authorization-filter doc:name="Authorization filter" doc:id="fc326e26-04ae-4ab2-8199-f9971c218374" requiredAuthorities="ROLE_ADMIN" />
 		<ee:transform doc:name="Transform Message" doc:id="ab3eaf13-510d-4ea5-bbf0-4a0f7f045790" >
 			<ee:message >
 			</ee:message>
@@ -399,28 +390,6 @@ output application/json
 output application/json
 ---
 payload]]></ee:set-variable>
-				<ee:set-variable variableName="vChartPayload" ><![CDATA[fun transformEvents(events) =
-    {
-        "events": events
-    }
-
-fun transformWorkerStatistics(workerStatistics, type1) =
-    workerStatistics map ((ws) ->
-        {
-            "id": ws.id,
-            "statistics": {
-                (type1): (ws.statistics[type1] pluck ((v, k) -> {
-                    (k):   v as String {format: "0.0", roundMode:"UP"} as Number 
-                })) reduce ((item, accumulator = {}) -> accumulator ++ item)
-            } 
-        }
-    )
----
-{
-    "events": transformEvents(payload.events),
-    "cpu": transformWorkerStatistics(payload.workerStatistics, "cpu"),
-    "memory": transformWorkerStatistics(payload.workerStatistics, "memoryPercentageUsed")
-}]]></ee:set-variable>
 			</ee:variables>
 		
 </ee:transform>
@@ -434,7 +403,7 @@ fun roundToOneDecimal(num) = floor(num * 10) / 10
 {
     timeFrom: vars.startDate,
     timeTo: vars.endDate,
-    eventsBetweenTimeFromAndTimeTo: payload.events pluck $,
+    eventsBetweenTimeFromAndTimeTo: payload.events pluck $ filter (item) -> item != 0,
     workerStatistics: payload.workerStatistics map {
         id: $.id,
         statistics: {
@@ -446,15 +415,13 @@ fun roundToOneDecimal(num) = floor(num * 10) / 10
 }]]></ee:set-payload>
 			</ee:message>
 		</ee:transform>
-		<logger level="INFO" doc:name="Logger" doc:id="3ff2ec38-f51d-44be-9739-6497e5f5678f" message="#[payload]"/>
 		<ms-aichain:agent-define-prompt-template doc:name="Agent define prompt template" doc:id="7b8fb826-7937-464d-9ec3-fe15f8a99f43" config-ref="MuleSoft_AI_Chain_Config">
 			<ms-aichain:dataset ><![CDATA[#[%dw 2.0
 output text/plain
 ---
 write(payload, "application/json",  { "indent": false })]]]></ms-aichain:dataset>
-			<ms-aichain:template ><![CDATA[#["PROVIDED IN DATASET ARE the statistics for number of events, cpu usage and memory usage of the workers of a mule api called " ++ vars.vApplicationName ++ ". Current vcore size is " ++ vars.vWorkerSizeValue ++ " and number of workers is " ++ vars.vWorkers ++ "  based on the provided stats in the Dataset what should be the correct settings of mule api vcores and workers. provide minimum settings so we dont waste the vcores. Suggest if vcores and workers needs to be increased if average memory and cpu usage is greater than 70
-percentage. Use the provided dataset and do not assume. You can also refer the links - https://docs.mulesoft.com/cloudhub/cloudhub-architecture"]]]></ms-aichain:template>
-			<ms-aichain:instructions ><![CDATA[provide the response in json with fields new vcores, new workers, analysisOfDataset and justification. Maximum workers possible in mule is 8. The vcore sizes available are 0.1,0.2,1,2,4,8,16.]]></ms-aichain:instructions>
+			<ms-aichain:template ><![CDATA[#["Given the dataset with statistics for events, CPU usage, and memory usage of Mule API application " ++ vars.vApplicationName ++ ", and the current worker size of " ++ vars.vWorkerSizeValue ++ " with number of workers as " ++ vars.vWorkers ++ ", determine the optimal worker size and worker settings. Ensure that the settings are minimal to avoid wasting vcores. If average CPU or memory usage exceeds 70 percent, recommend increasing vcores or workers.If average CPU or memory usage is less than 20 percent, recommend reducing vcores or workers. Use the provided data and do not make assumptions. You may refer to this link: https://docs.mulesoft.com/cloudhub/cloudhub-architecture."]]]></ms-aichain:template>
+			<ms-aichain:instructions ><![CDATA[provide the response in json with fields AI-Suggested-WorkerSize, AI-Suggested-Workers, analysisOfDataset(maxCpuUsagePercentage,maxMemoryUsagePercentage,avgCpuUsagePercentage,avgMemoryUsagePercentage) and justification. AI-Suggested-WorkerSize and AI-Suggested-Workers will be same as existing settings if no changes are needed. If changes are needed then suggest the new settings in AI-Suggested-WorkerSize and AI-Suggested-Workers. Note that Maximum workers possible in mule is 8. The vcore sizes available are 0.1,0.2,1,2,4,8,16.]]></ms-aichain:instructions>
 		</ms-aichain:agent-define-prompt-template>
 		<ee:transform doc:name="Transform Message" doc:id="828590ce-3b7f-48a8-8434-44ecb7742523" >
 			<ee:message >

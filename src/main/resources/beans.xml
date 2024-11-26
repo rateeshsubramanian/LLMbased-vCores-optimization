@@ -17,8 +17,6 @@
     <ss:authentication-provider>
       <ss:user-service id="mule">
         <ss:user name="${admin.user}" password="{noop}${admin.pass}" authorities="ROLE_ADMIN" />
-        <ss:user name="${developer.user}" password="{noop}${developer.pass}" authorities="ROLE_DEVELOPER" />
-        <ss:user name="${support.user}" password="{noop}${support.pass}" authorities="ROLE_SUPPORT" />
         
       </ss:user-service>
     </ss:authentication-provider>
