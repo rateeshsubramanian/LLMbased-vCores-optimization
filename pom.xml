@@ -3,11 +3,11 @@
 	<modelVersion>4.0.0</modelVersion>
 
 	<groupId>com.mycompany</groupId>
-	<artifactId>exp-vcores-mgmt</artifactId>
+	<artifactId>LLMbased-vCores-optimization</artifactId>
 	<version>1.0.0-SNAPSHOT</version>
 	<packaging>mule-application</packaging>
 
-	<name>LLMbased-vCores-optimization1</name>
+	<name>LLMbased-vCores-optimization</name>
 
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
